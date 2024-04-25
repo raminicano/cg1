@@ -1,0 +1,7 @@
+# not uploading data
+json-server/data.json
+data/*
+experiment/data
+
+#env file
+.env
