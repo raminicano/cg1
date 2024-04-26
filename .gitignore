@@ -5,3 +5,6 @@ experiment/data
 
 #env file
 .env
+
+# secret file
+fastapi-server/app/secret.json
