@@ -59,6 +59,16 @@ async def fetch_and_save_congestion(place: str = Query(...)):
         return {"status_code": e.status_code, "result": e.detail}
 
 
+# 위치 기준 혼잡도 찾기
+@app.get("/location/test")
+async def test(location: str, input_time: datetime = Query(None)):
+    closest_location = fetch_congestion_data(location)
+    print(closest_location)
+    query = {
+            "AREA_NM": closest_location
+        }
+    data = mydb['congestion'].find_one(query)
+    return {'code' : 200, 'data' : data}
 
 # 위치 기준 혼잡도 찾기
 @app.get("/location/congestion")
@@ -72,8 +82,6 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
         one_hour_ago = datetime.now() - timedelta(hours=1)
         hour = one_hour_ago.hour  # 시간 부분 추출
         date_str = input_time.strftime("%Y-%m-%d")
-
-
 
         # 쿼리에서 시간 비교
         query = {
@@ -101,7 +109,7 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
         # return data
         if not data:
             # 데이터를 저장하고
-            result = await fetch_and_save_congestion(location=closest_location)
+            result = await fetch_and_save_congestion(place=closest_location)
             print(result)
             # 다시 쿼리 호출
             data = mydb['congestion'].find_one({"AREA_NM": closest_location}, sort=[('_id', -1)])
@@ -164,3 +172,17 @@ async def hot_search(place: str, congestion: str, input_time: datetime = Query(N
     
     return {"code": 400, "message": "혼잡하지 않은 지역 찾기에 실패했습니다."}
 
+
+# 위치기반 이벤트 검색
+@app.get("/location/search/event")
+async def get_events(area_nm: str = Query(..., description="The area name to filter events")):
+    query = {"AREA_NM": area_nm}
+    projection = {"AREA_NM" : 1,"EVENT_STTS.EVENT_PERIOD": 1, "EVENT_STTS.EVENT_PLACE": 1, "EVENT_STTS.THUMBNAIL": 1, "EVENT_STTS.URL": 1, "_id": 0}
+    try:
+        data = mydb['congestion'].find_one(query, projection, sort=[('_id', -1)])
+        if not data or len(data["EVENT_STTS"]) == 0:
+            return {'code' : 404, 'message' : '이벤트 데이터가 없습니다.'}
+        else : 
+            return {'code' : 200, 'message' : '이벤트 데이터를 조회하는데 성공했습니다.', 'data' : data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
