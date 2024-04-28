@@ -27,7 +27,7 @@ HOSTNAME = get_secret("ATLAS_Hostname")
 USERNAME = get_secret("ATLAS_Username")
 PASSWORD = get_secret("ATLAS_Password")
 
-client = mongo_client.MongoClient(f'mongodb+srv://{USERNAME}:{PASSWORD}@{HOSTNAME}')
+client = mongo_client.MongoClient(f'mongodb://{USERNAME}:{PASSWORD}@{HOSTNAME}')
 print('Connected to Mongodb...')
 
 mydb = client['cg']
@@ -40,5 +40,5 @@ async def create_item(collection_name: str, item):
         result = collection.insert_one(item)
         return {"_id": str(result.inserted_id), "message": "Item successfully added"}
     except PyMongoError as e:
-        raise HTTPException(status_code=400, result=f"Error saving item: {str(e)}")
+        return {"status_code" : 400, "result" : f"Error saving item: {str(e)}"}
 
