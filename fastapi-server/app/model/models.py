@@ -17,4 +17,8 @@ class LocationQuery(BaseModel):
     quarter: int
 
 
-
+class CateogoryQuery(BaseModel):
+    location: str
+    gender: str
+    age: int
+    quarter: int

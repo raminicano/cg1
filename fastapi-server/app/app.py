@@ -237,11 +237,74 @@ async def location_recommend(request: LocationQuery):
 
         # 가장 가까운 10개 데이터 필터링
         closest_data = sorted(all_data, key=lambda x: x['distance'])[:10]
+        
+        # 성별 및 연령대별로 매출 금액이 높은 순으로 정렬
+        highest_gender_sales = [{
+                "상권_코드_명": data["상권_코드_명"],
+                "서비스_업종_코드_명": data["서비스_업종_코드_명"],
+                "기준_년분기_코드": data["기준_년분기_코드"],
+                "자치구_코드_명": data["자치구_코드_명"],
+                "행정동_코드_명": data["행정동_코드_명"],
+                "sales": data['매출액'][gender_sales]
+            } for data in closest_data]
 
-        highest_gender_sales = sorted(closest_data, key=lambda x: x['매출액'][gender_sales], reverse=True)
-        highest_age_sales = sorted(closest_data, key=lambda x: x['매출액'][age_sales], reverse=True)
-
+        highest_age_sales = [{
+                "상권_코드_명": data["상권_코드_명"],
+                "서비스_업종_코드_명": data["서비스_업종_코드_명"],
+                "기준_년분기_코드": data["기준_년분기_코드"],
+                "자치구_코드_명": data["자치구_코드_명"],
+                "행정동_코드_명": data["행정동_코드_명"],
+                "sales": data['매출액'][age_sales]
+            } for data in closest_data]
         
         return {"code": 200, "message" : "상권 추정 매출 데이터 조회에 성공했습니다.", "data": {"gender" : highest_gender_sales, "age" : highest_age_sales}}
     except requests.RequestException as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+
+
+@app.post("/location/recommend/category")
+async def category_recommend(request: CateogoryQuery):
+    base_url = "http://0.0.0.0:5001/data"
+    # 위치 정보를 먼저 조회
+    lati, long = get_location(request.location)
+
+    df = pd.read_csv('../../data/only_store.csv', index_col=0)
+    df['distance'] = df.apply(lambda row: haversine(lati, long, row['위도'], row['경도']), axis=1)
+    df_sorted = df.sort_values(by='distance').head(100)
+
+    all_data = [] 
+    for store_code in df_sorted['상권_코드_명'].unique():
+        params = {
+            "상권_코드_명": store_code,
+            "기준_년분기_코드": request.quarter
+        }
+        try:
+            response = requests.get(base_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            all_data.extend(data)  # 각 요청의 결과를 모아 리스트에 추가
+        except requests.RequestException as e:
+            continue  # 오류 발생 시 해당 상권 코드명에 대한 요청을 건너뛰고 계속 진행
+
+   # 성별 정제
+    gender_sales = f'{request.gender}_매출_금액'
+    # 연령대 정제
+    age_sales = f'연령대_{request.age}_매출_금액'
+
+    sales_gender_summary = {}
+    sales_age_summary = {}
+    for item in all_data:
+        service_type = item['서비스_업종_코드_명']
+        if service_type in sales_gender_summary:
+            sales_gender_summary[service_type] += item['매출액'][gender_sales]
+            sales_age_summary[service_type] += item['매출액'][age_sales]
+        else:
+            sales_gender_summary[service_type] = item['매출액'][gender_sales]
+            sales_age_summary[service_type] = item['매출액'][age_sales]
+
+    sorted_sales_gender_summary = dict(sorted(sales_gender_summary.items(), key=lambda x: x[1], reverse=True))
+    sorted_sales_age_summary = dict(sorted(sales_age_summary.items(), key=lambda x: x[1], reverse=True))
+
+    return {"code": 200, "message" : "상권 추정 매출 데이터 조회에 성공했습니다.", "data": {"gender" : sorted_sales_gender_summary, "age" : sorted_sales_age_summary}}
+
