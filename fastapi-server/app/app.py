@@ -178,6 +178,7 @@ async def hot_search(place: str, congestion: str, input_time: datetime = Query(N
     df_sorted = df[df['랜드마크'] != place].sort_values(by='distance')
 
     current_index = congestion_levels.index(congestion)
+    print(current_index)
     if (current_index == 0) or (current_index == 1):
         return {"code": 201, "message": "혼잡 데이터를 찾지 않아도 됩니다."}
     # 혼잡하지 않은 랜드마크 찾기
@@ -196,6 +197,7 @@ async def hot_search(place: str, congestion: str, input_time: datetime = Query(N
 async def get_events(area_nm: str = Query(..., description="The area name to filter events")):
     query = {"AREA_NM": area_nm}
     projection = {"AREA_NM" : 1,"EVENT_STTS.EVENT_PERIOD": 1, "EVENT_STTS.EVENT_PLACE": 1, "EVENT_STTS.THUMBNAIL": 1, "EVENT_STTS.URL": 1, "_id": 0}
+    print(query)
     try:
         data = mydb['congestion'].find_one(query, projection, sort=[('_id', -1)])
         if not data or len(data["EVENT_STTS"]) == 0:

@@ -131,4 +131,65 @@ router.get('/search-congestion', async (req, res) => {
   }
 });
 
+// 근처 혼잡도 조회
+router.get('/search-hotspot', async (req, res) => {
+    const { place, congestion, input_time } = req.query;
+    try {
+        // 서버에 HTTP GET 요청 보내기
+        const response = await axios.get('http://localhost:3000/location/search/hot', {
+            params: { place, congestion, input_time }
+        });
+        // 응답 받은 데이터를 클라이언트에게 반환
+        res.json(response.data);
+        
+    } catch (error) {
+        console.error('Error during database query or API call', error);
+        res.status(500).send('Internal Server Error');
+      }
+});
+
+
+// 이벤트 조회
+router.get('/search-event', async (req, res) => {
+    const { area_nm } = req.query;
+    try {
+        // event 테이블에서 해당 area_nm이 있는지 조회
+        const [rows] = await pool.query(
+            'SELECT * FROM event WHERE area_nm = ?',
+            [area_nm]
+        );
+
+        if (rows.length > 0) {
+            // 해당 area_nm이 있는 경우 데이터 반환
+            res.json(rows);
+        } else {
+            // 해당 area_nm이 없는 경우 외부 API 호출
+            const externalResponse = await axios.get('http://localhost:3000/location/search/event', {
+                params: { area_nm }
+            });
+
+            // 외부 API 호출 후 응답 확인
+            if (externalResponse.data.code === 404) {
+                // 이벤트 데이터가 없는 경우
+                res.status(404).json({ message: '이벤트 데이터가 없습니다.' });
+            } else {
+                // 다시 event 테이블 조회
+                const [newRows] = await pool.query(
+                    'SELECT * FROM event WHERE area_nm = ?',
+                    [area_nm]
+                );
+
+                // 조회된 데이터 반환
+                res.json(newRows);
+            }
+        }
+    } catch (error) {
+        console.error('Error during database query or API call', error);
+        res.status(500).send('Internal Server Error');
+    }
+});
+
+
+
+
 module.exports = router;
