@@ -9,8 +9,10 @@ import os
 from database import mydb, create_item
 import pydantic
 from datetime import datetime, timedelta
-from services.location_service import fetch_congestion_data, haversine
+from services.location_service import fetch_congestion_data, haversine, get_location
 import pandas as pd
+from model.models import *
+
 
 
 pydantic.json.ENCODERS_BY_TYPE[ObjectId] = str
@@ -186,3 +188,60 @@ async def get_events(area_nm: str = Query(..., description="The area name to fil
             return {'code' : 200, 'message' : '이벤트 데이터를 조회하는데 성공했습니다.', 'data' : data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    
+
+@app.post("/get_data")
+async def query_data(request: DataQueryData):
+    base_url = "http://0.0.0.0:5001/data"
+    params = request.dict(exclude_none=True)  # None 값 제외하고 딕셔너리 생성
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()  # 오류가 발생하면 예외를 발생
+        data = response.json()
+        if len(data) == 0:
+            return {"code": 201, "message" : "상권 추정 매출 데이터가 없습니다.", "data": data}
+        return {"code": 200, "message" : "상권 추정 매출 데이터 조회에 성공했습니다.", "data": data}
+    except requests.RequestException as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+
+
+@app.post("/location/recommend/store")
+async def location_recommend(request: LocationQuery):
+    base_url = "http://0.0.0.0:5001/data"
+    # 위치 정보를 먼저 조회
+    lati, long = get_location(request.location)
+
+    # 성별 정제
+    gender_sales = f'{request.gender}_매출_금액'
+    # 연령대 정제
+    age_sales = f'연령대_{request.age}_매출_금액'
+
+    # API에 전송할 파라미터 준비
+    params = {
+        "서비스_업종_코드_명": request.category,
+        "기준_년분기_코드": request.quarter
+    }
+
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()  # 오류가 발생하면 예외를 발생
+        all_data = response.json()
+        if len(all_data) == 0:
+            return {"code": 201, "message" : "상권 추정 매출 데이터가 없습니다.", "data": data}
+        # 거리 계산
+        
+        for data in all_data:
+            data['distance'] = haversine(lati, long, data['위도'], data['경도'])
+
+        # 가장 가까운 10개 데이터 필터링
+        closest_data = sorted(all_data, key=lambda x: x['distance'])[:10]
+
+        highest_gender_sales = sorted(closest_data, key=lambda x: x['매출액'][gender_sales], reverse=True)
+        highest_age_sales = sorted(closest_data, key=lambda x: x['매출액'][age_sales], reverse=True)
+
+        
+        return {"code": 200, "message" : "상권 추정 매출 데이터 조회에 성공했습니다.", "data": {"gender" : highest_gender_sales, "age" : highest_age_sales}}
+    except requests.RequestException as e:
+        raise HTTPException(status_code=400, detail=str(e))
