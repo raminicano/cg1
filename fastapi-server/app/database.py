@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException
 from bson.objectid import ObjectId
 from pymongo import mongo_client
 from pymongo.errors import PyMongoError
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 import pydantic
 import os.path
@@ -42,3 +44,32 @@ async def create_item(collection_name: str, item):
     except PyMongoError as e:
         return {"status_code" : 400, "result" : f"Error saving item: {str(e)}"}
 
+# MySQL 설정
+MYSQL_USERNAME = get_secret("Mysql_Username")
+MYSQL_PASSWORD = get_secret("Mysql_Password")
+MYSQL_HOSTNAME = get_secret("Mysql_Hostname")
+MYSQL_DATABASE = get_secret("Mysql_DBname")
+MYSQL_PORT = get_secret("Mysql_Port")
+
+DB_URL = f'mysql+pymysql://{MYSQL_USERNAME}:{MYSQL_PASSWORD}@{MYSQL_HOSTNAME}:{MYSQL_PORT}/{MYSQL_DATABASE}'
+
+class db_conn:
+    def __init__(self):
+        self.engine = create_engine(DB_URL, pool_recycle=500)
+    
+    def sessionmaker(self):
+        Session = sessionmaker(bind=self.engine)
+        session = Session()
+        return session
+    
+    def connection(self):
+        conn = self.engine.connect()
+        return conn
+
+# db_conn 인스턴스 생성
+db_connection = db_conn()
+
+print('Connected to MySQL...')
+
+
+        

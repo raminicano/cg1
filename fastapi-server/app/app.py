@@ -6,12 +6,13 @@ from bson.objectid import ObjectId
 import requests
 import json
 import os
-from database import mydb, create_item
+from database import mydb, create_item, db_connection
 import pydantic
 from datetime import datetime, timedelta
 from services.location_service import fetch_congestion_data, haversine, get_location
 import pandas as pd
 from model.models import *
+from model.sql_models import *
 
 
 
@@ -61,7 +62,7 @@ async def fetch_and_save_congestion(place: str = Query(...)):
         return {"status_code": e.status_code, "result": e.detail}
 
 
-# 위치 기준 혼잡도 찾기
+# 위치 기준 혼잡도 찾기 테스트
 @app.get("/location/test")
 async def test(location: str, input_time: datetime = Query(None)):
     closest_location = fetch_congestion_data(location)
@@ -95,7 +96,6 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
                 ]
             }
         }
-
     else:
         query = {
             "AREA_NM": closest_location
@@ -106,27 +106,19 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
     result_data = {}
 
     try:
-        data = mydb['congestion'].find_one(query, sort=[('_id', -1)]) # sort로 가장 최근에 들어간 데이터를 가져와서 제일 정확도가 높은 데이터를 가져옴
-        # data = mydb['congestion'].find(query, {"_id" : 0}, sort=[('_id', -1)])
-        # return data
-        if not data:
-            # 데이터를 저장하고
-            result = await fetch_and_save_congestion(place=closest_location)
-            print(result)
-            # 다시 쿼리 호출
-            data = mydb['congestion'].find_one({"AREA_NM": closest_location}, sort=[('_id', -1)])
-            # raise HTTPException(status_code=404, detail="Data not found")
+        #data = mydb['congestion'].find_one(query, sort=[('_id', -1)]) 굳이 찾을 필요 없음
+        # if not data:
+        result = await fetch_and_save_congestion(place=closest_location)
+        print(result)
+        data = mydb['congestion'].find_one(query, sort=[('_id', -1)])
         
-        # 현재시간은 입력을 안할것임 그래서 현재시간이지만 과거에 호출한 경우는 없다.
         if input_time.date() == current_time.date() and input_time.hour == current_time.hour:
             print('현재시간 동일함')
-            # 현재 시간 데이터를 반환
             result_data = { 
                 "area_nm" : closest_location,
                 "area_congest_lvl": data["LIVE_PPLTN_STTS"][0]["AREA_CONGEST_LVL"],
                 "area_congest_msg": data["LIVE_PPLTN_STTS"][0]["AREA_CONGEST_MSG"],
-                # "inquiry_time": input_time.strftime("%Y.%m.%d %H:%M")
-                "inquiry_time": current_time
+                "inquiry_time": input_time
             }
         else:
             # 입력 시간에 해당하는 예측 데이터를 찾기
@@ -139,8 +131,26 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
                 "area_nm" : closest_location,
                 "area_congest_lvl": forecast_data["FCST_CONGEST_LVL"],
                 "area_congest_msg" : message[forecast_data["FCST_CONGEST_LVL"]],
-                "pre_inquiry_time": forecast_data['FCST_TIME']
+                "inquiry_time": forecast_data['FCST_TIME']
             }
+        
+            # 리턴하기 전에 mysql에 저장하기
+            # 새로운 데이터 엔트리 생성
+            new_entry = Congestion(
+                area_nm=result_data['area_nm'],
+                inquiry_time=result_data['inquiry_time'],  # 적절한 datetime 객체 필요
+                area_congest_lvl=result_data['area_congest_lvl'],
+                area_congest_msg=result_data['area_congest_msg']
+            )
+
+            try:
+                # 세션 사용
+                with db_connection.get_session() as session:
+                    session.add(new_entry)
+                    session.commit()  # 데이터베이스에 변경사항 커밋
+                    print('데이터가 성공적으로 저장되었습니다.')  # 성공 메시지 출력
+            except Exception as e:
+                print(f'데이터 저장 중 오류가 발생했습니다: {e}')
 
         return {"code": 200, "message": "혼잡도 데이터 조회에 성공하였습니다.", "data": result_data}
     except Exception as e:
@@ -150,7 +160,11 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
 # 근처 혼잡하지 않은 핫스팟 조회
 @app.get("/location/search/hot")
 async def hot_search(place: str, congestion: str, input_time: datetime = Query(None)):
-    df = pd.read_csv('../../data/landmark_final.csv')
+    # df = pd.read_csv('../../data/landmark_final.csv')
+    with db_connection.sessionmaker() as session:
+        query = session.query(Landmark)
+        df = pd.read_sql(query.statement, session.bind)
+    
     congestion_levels = list(message.keys())
     current_lat = df[df['랜드마크'] == place]['위도'].values[0]
     current_lon = df[df['랜드마크'] == place]['경도'].values[0]
@@ -185,6 +199,23 @@ async def get_events(area_nm: str = Query(..., description="The area name to fil
         if not data or len(data["EVENT_STTS"]) == 0:
             return {'code' : 404, 'message' : '이벤트 데이터가 없습니다.'}
         else : 
+            for event in data['EVENT_STTS']:
+                new_event = Event(
+                    area_nm=area_nm,
+                    event_period=event.get('EVENT_PERIOD'),
+                    event_place=event.get('EVENT_PLACE'),
+                    thumbnail=event.get('THUMBNAIL'),
+                    url=event.get('URL')
+                )
+                try:
+                    # 세션 사용
+                    with db_connection.sessionmaker() as session:
+                        session.add(new_event)
+                        session.commit()  # 데이터베이스에 변경사항 커밋
+                        print('데이터가 성공적으로 저장되었습니다.')  # 성공 메시지 출력
+                except Exception as e:
+                    print(f'데이터 저장 중 오류가 발생했습니다: {e}')
+
             return {'code' : 200, 'message' : '이벤트 데이터를 조회하는데 성공했습니다.', 'data' : data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -269,7 +300,11 @@ async def category_recommend(request: CateogoryQuery):
     # 위치 정보를 먼저 조회
     lati, long = get_location(request.location)
 
-    df = pd.read_csv('../../data/only_store.csv', index_col=0)
+    # 데이터베이스에서 상점 데이터 가져오기
+    with db_connection.sessionmaker() as session:
+        query = session.query(Store)
+        df = pd.read_sql(query.statement, session.bind)
+
     df['distance'] = df.apply(lambda row: haversine(lati, long, row['위도'], row['경도']), axis=1)
     df_sorted = df.sort_values(by='distance').head(100)
 
