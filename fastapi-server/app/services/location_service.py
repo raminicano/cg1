@@ -52,7 +52,7 @@ def haversine(lat1, lon1, lat2, lon2):
 
 def fetch_congestion_data(address: str):
     latitude, longitude = get_location(address)
-    df = pd.read_csv('../../data/landmark_final.csv')
+    df = pd.read_csv('/Users/yunju/cg1/data/landmark_final.csv')
     df['distance'] = df.apply(lambda row: haversine(latitude, longitude, row['위도'], row['경도']), axis=1)
     closest_location = df.loc[df['distance'].idxmin()]['랜드마크']
     

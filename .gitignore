@@ -8,3 +8,7 @@ experiment/data
 
 # secret file
 fastapi-server/app/secret.json
+
+# moduls
+node-js/package*
+node-js/node_modules

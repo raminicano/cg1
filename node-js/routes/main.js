@@ -1,93 +1,134 @@
-const express = require('express')
-const bodyParser = require('body-parser')
-const mysql = require('sync-mysql')
-const env = require('dotenv').config({ path: "../../.env"})
 
-const app = express()
+const express = require('express');
+const router = express.Router();
+const axios = require('axios');
+const mysql = require('mysql2/promise');
+const haversine = require('haversine');
 
-app.use(bodyParser.json())
-app.use(bodyParser.urlencoded({extended: false}))
-app.use(express.json())
-app.use(express.urlencoded({extended: true}))
+require('dotenv').config({ path: "../.env" });
 
-var connection = new mysql({
-    host:process.env.host,
-    user:process.env.user,
-    port:process.env.port,
-    password:process.env.password,
-    database:process.env.database
+// Kakao REST API 키
+const KAKAO_API_KEY = process.env.KAKAO_API_KEY;
+
+
+// 데이터베이스 연결 설정
+const pool = mysql.createPool({
+  host: process.env.host,
+  user: process.env.user,
+  port: process.env.port,
+  password: process.env.password,
+  database: process.env.database
 });
 
 
-app.get('/Hello', (req, res) => {
-    res.send("Hello World")
-})
+// 위치 정보 가져오기
+async function getLocation(address) {
+    const url = 'https://dapi.kakao.com/v2/local/search/keyword.json';
+    const headers = {
+      Authorization: `KakaoAK ${KAKAO_API_KEY}`
+    };
+    const response = await axios.get(url, { headers, params: { query: address } });
+    const documents = response.data.documents[0];
+    return { latitude: parseFloat(documents.y), longitude: parseFloat(documents.x) };
+  }
 
+  // 가장 가까운 랜드마크 찾기
+async function findClosestLandmark(latitude, longitude) {
+    const [rows] = await pool.query('SELECT 랜드마크, 위도, 경도 FROM landmark');
+    let minDistance = Infinity;
+    let closestLandmark = null;
+  
+    rows.forEach(row => {
+      const start = { latitude, longitude };
+      const end = { latitude: row.위도, longitude: row.경도 };
+      const distance = haversine(start, end, { unit: 'km' });
+  
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestLandmark = row.랜드마크;
+      }
+    });
+  
+    return closestLandmark;
+  }
+  
 
-// select all rows from st_info table
-app.get('/select', (req, res) => {
-    const result = connection.query("select * from st_info")
-    console.log(result);
-    // res.send(result);
-    res.writeHead(200);
-    var template = `
-    <!Doctype html>
-    <html>
-        <head>
-            <meta charset="utf-8">
-            <title>Result</title>
-        </head>
-        <body>
-            <table border="1" margin:auto; text-align:center;>
-            <tr>
-                <th>ST_ID</th>
-                <th>NAME</th>
-                <th>DEPT</th>
-            </tr>
-            `;
-    for(var i = 0; i < result.length; i++) {
-        template += `
-            <tr>
-                <th>${result[i]['ST_ID']}</th>
-                <th>${result[i]['NAME']}</th>
-                <th>${result[i]['DEPT']}</th>
-            </tr>
-            `
+// mysql db connection test
+router.get('/test-db-connection', async (req, res) => {
+    try {
+      const connection = await pool.getConnection(); // 연결 시도
+      res.send('Database connection successful!');   // 연결 성공 메시지
+      connection.release();                          // 연결 해제
+    } catch (error) {
+      console.error('Database connection failed:', error);
+      res.status(500).send('Database connection failed'); // 연결 실패 메시지
     }
-    template += `
-            </table>
-        </body>
-    </html>
-    `;
-    res.end(template);
-})
+  });
+  
+// congestion 테이블 데이터 조회 API
+router.get('/get-congestion', async (req, res) => {
+    try {
+        const [rows] = await pool.query('SELECT * FROM congestion');
 
+        // 각 행의 날짜/시간 데이터를 UTC로 변환
+        const modifiedRows = rows.map(row => {
+          if (row.inquiry_time) {
+            // MySQL에서는 시간이 UTC로 저장되어 있을 수 있으므로, 클라이언트에게는 이를 ISO 문자열로 반환
+            row.inquiry_time = new Date(row.inquiry_time + 'Z').toISOString();
+          }
+          return row;
+        });
+    
+        res.json(modifiedRows);
+    } catch (error) {
+      console.error('Error during database query:', error);
+      res.status(500).send('Error while fetching data from database');
+    }
+  });
 
-// insert data into st_info table
-app.get('/insert', (req, res) => {
-    const { ST_ID, NAME, DEPT } = req.query
-    const result = connection.query(
-        "insert into st_info values (?, ?, ?)", [ST_ID, NAME, DEPT]
-    )
-    res.redirect('/select')
-})
+// congestion 데이터 조회 및 외부 API 호출
+router.get('/search-congestion', async (req, res) => {
+  const { location, inquiry_time } = req.query;
+  let closestLandmark; // closestLandmark 변수를 미리 선언
 
-// update row data into st_info table
-app.get('/update', (req, res) => {
-    const { ST_ID, NAME, DEPT } = req.query
-    const result = connection.query(
-        "update st_info set NAME=?, DEPT=? where ST_ID=?", [NAME, DEPT, ST_ID]
-    )
-    res.redirect('/select')
-})
+  // 가장 가까운 랜드마크 찾기
+    try {
+        const { latitude, longitude } = await getLocation(location);
+        closestLandmark = await findClosestLandmark(latitude, longitude);
 
-// delete row data into st_info table
-app.get('/delete', (req, res) => {
-    const ST_ID = req.query.ST_ID
-    const result = connection.query(
-        "delete from st_info where ST_ID=?", [ST_ID]
-    )
-    res.redirect('/select')
-})
+    } catch (error) {
+        console.error('Error during API call:', error);
+        res.status(500).send('Error fetching congestion data');
+    }
 
-module.exports = app;
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM congestion WHERE area_nm = ? AND inquiry_time = ?',
+      [closestLandmark, inquiry_time]
+    );
+
+    console.log(inquiry_time);
+
+    if (rows.length > 0) {
+      res.json(rows);
+    } else {
+      // 데이터가 없을 경우 외부 API 호출
+      await axios.get('http://localhost:3000/location/congestion', {
+        params: { location, input_time: inquiry_time }
+      });
+
+      // 다시 데이터 조회
+      const [newRows] = await pool.query(
+        'SELECT * FROM congestion WHERE area_nm = ? AND inquiry_time = ?',
+        [closestLandmark, inquiry_time]
+      );
+
+      res.json(newRows);
+    }
+  } catch (error) {
+    console.error('Error during database query or API call', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+module.exports = router;

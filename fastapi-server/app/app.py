@@ -79,8 +79,9 @@ async def test(location: str, input_time: datetime = Query(None)):
 async def get_congestion_info(location: str, input_time: datetime = Query(None)):
     closest_location = fetch_congestion_data(location)
 
-    print(closest_location)
+    print(closest_location, input_time)
     # 입력 시간이 제공되지 않았다면 현재 시간을 사용
+
     if input_time is None:
         input_time = datetime.now()
         one_hour_ago = datetime.now() - timedelta(hours=1)
@@ -107,10 +108,10 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
     result_data = {}
 
     try:
-        #data = mydb['congestion'].find_one(query, sort=[('_id', -1)]) 굳이 찾을 필요 없음
-        # if not data:
-        result = await fetch_and_save_congestion(place=closest_location)
-        print(result)
+        data = mydb['congestion'].find_one(query, sort=[('_id', -1)]) #굳이 찾을 필요 없음
+        if not data:
+            result = await fetch_and_save_congestion(place=closest_location)
+            print(result)
         data = mydb['congestion'].find_one(query, sort=[('_id', -1)])
         
         if input_time.date() == current_time.date() and input_time.hour == current_time.hour:
@@ -146,7 +147,7 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
 
             try:
                 # 세션 사용
-                with db_connection.get_session() as session:
+                with db_connection.sessionmaker() as session:
                     session.add(new_entry)
                     session.commit()  # 데이터베이스에 변경사항 커밋
                     print('데이터가 성공적으로 저장되었습니다.')  # 성공 메시지 출력
