@@ -6,13 +6,13 @@ from bson.objectid import ObjectId
 import requests
 import json
 import os
-from database import mydb, create_item, db_connection
+from .database import mydb, create_item, db_connection
 import pydantic
 from datetime import datetime, timedelta
-from services.location_service import fetch_congestion_data, haversine, get_location
+from .services.location_service import fetch_congestion_data, haversine, get_location
 import pandas as pd
-from model.models import *
-from model.sql_models import *
+from .model.models import *
+from .model.sql_models import *
 
 
 
@@ -29,8 +29,9 @@ message = {
 }
 
 # MongoDB 접속 설정
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.relpath(__file__)))
-secret_file = os.path.join(BASE_DIR, 'secret.json')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+secret_file = os.path.join(BASE_DIR, './secret.json')
+
 
 with open(secret_file) as f:
     secrets = json.loads(f.read())

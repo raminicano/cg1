@@ -12,7 +12,7 @@ import json
 
 pydantic.json.ENCODERS_BY_TYPE[ObjectId] = str
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.relpath("./")))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 secret_file = os.path.join(BASE_DIR, 'secret.json')
 
 with open(secret_file) as f:
