@@ -74,6 +74,8 @@ async def test(location: str, input_time: datetime = Query(None)):
     data = mydb['congestion'].find_one(query)
     return {'code' : 200, 'data' : data}
 
+
+
 # 위치 기준 혼잡도 찾기
 @app.get("/location/congestion")
 async def get_congestion_info(location: str, input_time: datetime = Query(None)):
@@ -220,7 +222,6 @@ async def get_events(area_nm: str = Query(..., description="The area name to fil
                 except Exception as e:
                     print(f'데이터 저장 중 오류가 발생했습니다: {e}')
 
-            return {'code' : 200, 'message' : '이벤트 데이터를 조회하는데 성공했습니다.', 'data' : data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -241,12 +242,18 @@ async def query_data(request: DataQueryData):
         raise HTTPException(status_code=400, detail=str(e))
     
 
-
+# 위치 추천
 @app.post("/location/recommend/store")
 async def location_recommend(request: LocationQuery):
     base_url = "http://0.0.0.0:5001/data"
     # 위치 정보를 먼저 조회
     lati, long = get_location(request.location)
+
+    # # 위치 정보를 MongoDB에서 조회
+    # existing_data = mydb['store'].find_one({"location": request.location})
+    # if existing_data:
+    #     return {"code": 200, "message": "데이터가 이미 존재합니다.", "data": existing_data["data"]}
+
 
     # 성별 정제
     gender_sales = f'{request.gender}_매출_금액'
@@ -292,12 +299,24 @@ async def location_recommend(request: LocationQuery):
                 "sales": data['매출액'][age_sales]
             } for data in closest_data]
         
-        return {"code": 200, "message" : "상권 추정 매출 데이터 조회에 성공했습니다.", "data": {"gender" : highest_gender_sales, "age" : highest_age_sales}}
+
+        gender_key = f"{request.gender}_sales"  # 예: 'male_sales'
+        age_key = f"age_{request.age}_sales"  # 예: 'age_20_sales'
+
+        mydb['store'].insert_one({
+            "location": request.location,
+            "data": {
+                gender_key: highest_gender_sales,
+                age_key: highest_age_sales
+            }
+        })
+
+        return {"code": 200, "message" : "상권 추정 매출 데이터 조회에 성공했습니다.", "data": {gender_key : highest_gender_sales, age_key: highest_age_sales}}
     except requests.RequestException as e:
         raise HTTPException(status_code=400, detail=str(e))
     
 
-
+# 업종추천
 @app.post("/location/recommend/category")
 async def category_recommend(request: CateogoryQuery):
     base_url = "http://0.0.0.0:5001/data"
@@ -326,7 +345,7 @@ async def category_recommend(request: CateogoryQuery):
         except requests.RequestException as e:
             continue  # 오류 발생 시 해당 상권 코드명에 대한 요청을 건너뛰고 계속 진행
 
-   # 성별 정제
+
     gender_sales = f'{request.gender}_매출_금액'
     # 연령대 정제
     age_sales = f'연령대_{request.age}_매출_금액'

@@ -190,6 +190,204 @@ router.get('/search-event', async (req, res) => {
 });
 
 
+// 위치 추천
+router.post('/recommend-store', async (req, res) => {
+  const { location, category, gender, age, quarter } = req.body;
+  const genderKorean = gender === 'female' ? '여성' : '남성';
+
+  try {
+    const { latitude, longitude } = await getLocation(location);
+
+    // 가장 가까운 위치 데이터 조회
+    const nearestQuery = `
+        SELECT 상권_코드_명 FROM store
+        ORDER BY (POW((위도 - ?), 2) + POW((경도 - ?), 2))
+        LIMIT 10;
+    `;
+
+    const [nearest] = await pool.query(nearestQuery, [latitude, longitude]);
+    const districtCodes = nearest.map(entry => entry.상권_코드_명);
+
+    const locationQuery = `
+        SELECT * FROM location
+        WHERE district_code IN (?);
+    `;
+
+    const [locations] = await pool.query(locationQuery, [districtCodes]);
+    console.log("locationQuery:", locations);
+    if (location.length == 0) {
+      const savedData = await handleMissingCodes(districtCodes, location, category, genderKorean, age, quarter);
+      res.json({
+        code: 202,
+        message: "일부 데이터가 외부 API에서 가져와졌으며 데이터베이스에 저장되었습니다.",
+        data: savedData
+      });
+    }
+    // if문에 안걸리면 nearest에 데이터가 있는 것임
+    // 존재하지 않거나 데이터가 누락된 district_code 확인
+    const existingDistrictCodes = nearest.map(entry => entry.district_code);
+    const missingDistrictCodes = existingDistrictCodes.filter(code => !existingDistrictCodes.includes(code));
+
+    // 기존 위치에서 누락된 데이터 확인
+    const nullDataCodes = nearest.filter(entry => entry[gender] === null || entry['age_' + age] === null).map(entry => entry.district_code);
+
+    // 누락된 코드의 합집합 찾기
+    const allMissingCodes = [...new Set([...missingDistrictCodes, ...nullDataCodes])];
+
+    if (allMissingCodes.length > 0) {
+      // 외부 API 호출 및 데이터베이스 저장 로직
+      const savedData = await handleMissingCodes(allMissingCodes, location, category, genderKorean, age, quarter);
+      res.json({
+        code: 202,
+        message: "일부 데이터가 외부 API에서 가져와졌으며 데이터베이스에 저장되었습니다.",
+        data: savedData
+      });
+    } else {
+      res.json({
+        code: 200,
+        message: "모든 관련 데이터를 찾았습니다.",
+        data: nearest
+      });
+    }
+  } catch (error) {
+    console.error('데이터베이스 쿼리 또는 외부 API 호출 중 오류 발생:', error);
+    res.status(500).send('내부 서버 오류');
+  }
+});
+
+async function handleMissingCodes(codes, location, category, gender, age, quarter) {
+  var savedData = [];
+  // 외부 API 호출 및 데이터베이스에 저장
+  await Promise.all(codes.map(async code => {
+    const apiResponse = await axios.post('http://0.0.0.0:3000/location/recommend/store', {
+      location,
+      category,
+      gender,
+      age,
+      quarter
+    });
+
+    if (apiResponse.data.code === 200) {
+      // 데이터베이스에 각 상권 데이터 저장
+      const genderKey = `${gender}_sales`;
+      await Promise.all(apiResponse.data.data[genderKey].map(async (item) => {
+        console.log(item)
+         const insertResult1 = await pool.execute(`
+              INSERT INTO location (district_code, service_code, quarter, gu_code, dong_code, ${mysql.escapeId(gender)})
+              VALUES (?, ?, ?, ?, ?, ?)
+          `, [
+              item.상권_코드_명,
+              category,
+              quarter,
+              item.자치구_코드_명,
+              item.행정동_코드_명,
+              item.sales
+          ]);
+
+          // savedData.push(insertResult1);
+      }));
+
+      // 나이에 따른 데이터를 가정하고 추가 저장 로직을 구현
+      const ageKey = `age_${age}_sales`;
+
+      await Promise.all(apiResponse.data.data[ageKey].map(async (item) => {
+         const insertResult2 = await pool.execute(`
+              INSERT INTO location (district_code, service_code, quarter, gu_code, dong_code, ${mysql.escapeId('age_' + age)})
+              VALUES (?, ?, ?, ?, ?, ?)
+          `, [
+              item.상권_코드_명,
+              category,
+              quarter,
+              item.자치구_코드_명,
+              item.행정동_코드_명,
+              item.sales
+          ]);
+
+          // savedData.push(insertResult2);
+      }));
+
+  } else {
+      throw new Error("API 호출 실패 혹은 데이터 부재");
+  }
+    savedData.push(apiResponse.data); // 예시로 응답 데이터를 그대로 저장
+  }));
+  return savedData;
+}
+
+
+
+// 업종 추천
+router.post('/recommend-category', async (req, res) => {
+  const { location, gender, age, quarter } = req.body;
+  const genderKorean = gender === 'female' ? '여성' : '남성';
+
+  try {
+      // 먼저 성별 데이터의 존재 여부를 확인
+      var [genderResults] = await pool.query(`
+          SELECT * FROM category
+          WHERE location = ?
+          AND gender_or_age = ?
+          AND quarter = ?
+      `, [location, gender, quarter]);
+
+      // 연령 데이터의 존재 여부를 확인
+      var [ageResults] = await pool.query(`
+          SELECT * FROM category
+          WHERE location = ?
+          AND gender_or_age = ?
+          AND quarter = ?
+      `, [location, `age_${age}`, quarter]);
+
+      // 성별 및 연령 데이터 모두 없을 경우 FastAPI 호출
+      if (genderResults.length === 0 || ageResults.length === 0) {
+          const apiResponse = await axios.post('http://0.0.0.0:3000/location/recommend/category', { location, gender: genderKorean, age, quarter });
+          if (apiResponse.data.code === 200) {
+              // 성별 데이터 저장
+              const genderData = apiResponse.data.data.gender;
+              await saveData(gender, quarter, location, genderData);
+
+              // 연령 데이터 저장
+              const ageData = apiResponse.data.data.age;
+              await saveData(`age_${age}`, quarter, location, ageData);
+
+              // 저장 후 다시 쿼리 날리기
+              [genderResults] = await pool.query(`
+              SELECT * FROM category
+              WHERE location = ?
+              AND gender_or_age = ?
+              AND quarter = ?
+          `, [location, gender, quarter]);
+        
+              // 연령 데이터의 존재 여부를 확인
+              [ageResults] = await pool.query(`
+                  SELECT * FROM category
+                  WHERE location = ?
+                  AND gender_or_age = ?
+                  AND quarter = ?
+              `, [location, `age_${age}`, quarter]);
+
+          } else {
+              throw new Error("API 호출 실패 혹은 데이터 부재");
+          }
+      } else {
+          res.json({ code: 200, message: "데이터가 이미 존재합니다.", data: { genderResults, ageResults } });
+      }
+  } catch (error) {
+      console.error('데이터베이스 쿼리 또는 외부 API 호출 중 오류 발생:', error);
+      res.status(500).send('내부 서버 오류');
+  }
+});
+
+async function saveData(genderOrAge, quarter, location, data) {
+  await Promise.all(Object.entries(data).map(async ([serviceCode, sales]) => {
+      await pool.execute(`
+          INSERT INTO category (location, service_code, quarter, gender_or_age, sales)
+          VALUES (?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE sales = VALUES(sales)
+      `, [location, serviceCode, quarter, genderOrAge, sales]);
+  }));
+}
+
 
 
 module.exports = router;
