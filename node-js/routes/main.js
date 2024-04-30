@@ -113,17 +113,28 @@ router.get('/search-congestion', async (req, res) => {
       res.json(rows);
     } else {
       // 데이터가 없을 경우 외부 API 호출
-      await axios.get('http://localhost:3000/location/congestion', {
+      const apiResponse = await axios.get('http://localhost:3000/location/congestion', {
         params: { location, input_time: inquiry_time }
       });
+
+      // API에서 받은 데이터 처리
+      const result_data = apiResponse.data.data; // 가정: API 응답에 data 필드가 있고 그 안에 필요한 데이터가 있다.
+      const { area_nm: closestLandmark, inquiry_time: newInquiryTime } = result_data;
+      console.log(result_data)
+
 
       // 다시 데이터 조회
       const [newRows] = await pool.query(
         'SELECT * FROM congestion WHERE area_nm = ? AND inquiry_time = ?',
-        [closestLandmark, inquiry_time]
+        [closestLandmark, newInquiryTime]
       );
 
-      res.json(newRows);
+      // 응답 데이터 전송
+        if (newRows.length > 0) {
+          res.json({ code: 200, message: "혼잡도 데이터 조회에 성공하였습니다.", data: newRows });
+        } else {
+          res.json({ code: 404, message: "데이터가 없습니다.", data: {} });
+        }
     }
   } catch (error) {
     console.error('Error during database query or API call', error);
@@ -317,6 +328,7 @@ async function handleMissingCodes(codes, location, category, gender, age, quarte
 
 
 // 업종 추천
+// 같은 데이터로 저장되는거 확인해야됨
 router.post('/recommend-category', async (req, res) => {
   const { location, gender, age, quarter } = req.body;
   const genderKorean = gender === 'female' ? '여성' : '남성';
@@ -365,7 +377,8 @@ router.post('/recommend-category', async (req, res) => {
                   AND gender_or_age = ?
                   AND quarter = ?
               `, [location, `age_${age}`, quarter]);
-
+              
+              res.json({ code: 200, message: "데이터를 불러왔습니다.", data: { genderResults, ageResults } });
           } else {
               throw new Error("API 호출 실패 혹은 데이터 부재");
           }

@@ -89,6 +89,7 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
         one_hour_ago = datetime.now() - timedelta(hours=1)
         hour = one_hour_ago.hour  # 시간 부분 추출
         date_str = input_time.strftime("%Y-%m-%d")
+        time_only = input_time.strftime('%Y-%m-%d %H:%M:%S')
 
         # 쿼리에서 시간 비교
         query = {
@@ -122,7 +123,7 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
                 "area_nm" : closest_location,
                 "area_congest_lvl": data["LIVE_PPLTN_STTS"][0]["AREA_CONGEST_LVL"],
                 "area_congest_msg": data["LIVE_PPLTN_STTS"][0]["AREA_CONGEST_MSG"],
-                "inquiry_time": input_time
+                "inquiry_time": time_only
             }
         else:
             # 입력 시간에 해당하는 예측 데이터를 찾기
@@ -138,23 +139,25 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
                 "inquiry_time": forecast_data['FCST_TIME']
             }
         
-            # 리턴하기 전에 mysql에 저장하기
-            # 새로운 데이터 엔트리 생성
-            new_entry = Congestion(
-                area_nm=result_data['area_nm'],
-                inquiry_time=result_data['inquiry_time'],  # 적절한 datetime 객체 필요
-                area_congest_lvl=result_data['area_congest_lvl'],
-                area_congest_msg=result_data['area_congest_msg']
-            )
 
-            try:
-                # 세션 사용
-                with db_connection.sessionmaker() as session:
-                    session.add(new_entry)
-                    session.commit()  # 데이터베이스에 변경사항 커밋
-                    print('데이터가 성공적으로 저장되었습니다.')  # 성공 메시지 출력
-            except Exception as e:
-                print(f'데이터 저장 중 오류가 발생했습니다: {e}')
+        print('result', result_data)
+        # 리턴하기 전에 mysql에 저장하기
+        # 새로운 데이터 엔트리 생성
+        new_entry = Congestion(
+            area_nm=result_data['area_nm'],
+            inquiry_time=result_data['inquiry_time'],  # 적절한 datetime 객체 필요
+            area_congest_lvl=result_data['area_congest_lvl'],
+            area_congest_msg=result_data['area_congest_msg']
+        )
+
+        try:
+            # 세션 사용
+            with db_connection.sessionmaker() as session:
+                session.add(new_entry)
+                session.commit()  # 데이터베이스에 변경사항 커밋
+                print('데이터가 성공적으로 저장되었습니다.')  # 성공 메시지 출력
+        except Exception as e:
+            print(f'데이터 저장 중 오류가 발생했습니다: {e}')
 
         return {"code": 200, "message": "혼잡도 데이터 조회에 성공하였습니다.", "data": result_data}
     except Exception as e:
