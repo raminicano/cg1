@@ -1,25 +1,64 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="utf-8">
-        <title>sync-mysql Example</title>
-    </head>
-    <body>
-        <h1>sync-mysql Example</h1>
-        <form name="userForm" target="targetURL">
-            <input type="button" value="GET /Hello" onclick='document.targetURL.location.href="/Hello"'>&nbsp;&nbsp;&nbsp;
-            <input type="button" value="Select st_info" onclick='document.targetURL.location.href="/select"'><p>
-            ST_ID &nbsp;<input type="text" name="id" size="10"><p>
-            NAME <input type="text" name="name" size="10"><p>
-            DEPT &nbsp;<input type="text" name="dept" size="10"><p>
-            <input type="button" value="Insert st_info" onclick='document.targetURL.location.href="/insert?ST_ID="+document.userForm.id.value+"&NAME="+document.userForm.name.value+"&DEPT="+document.userForm.dept.value'><p></p>
-            <input type="button" value="update st_info" onclick='document.targetURL.location.href="/update?ST_ID="+document.userForm.id.value+"&NAME="+document.userForm.name.value+"&DEPT="+document.userForm.dept.value'><p></p>
-            <input type="button" value="delete st_info" onclick='document.targetURL.location.href="/delete?ST_ID="+document.userForm.id.value'><p></p>
+<html lang="ko">
 
-        </form>
-        
-        --------------------------------<br>
-        <iframe name="targetURL" class="ifram-preview center" width="90%" height="500" style="border: none;" src="http://192.168.1.75:8000/Hello">
-        </iframe>
-    </body>
+<head>
+    <meta charset="UTF-8">
+    <title>홈페이지</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+        }
+
+        .container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            /* Flexbox를 사용하여 요소들을 가로로 배열 */
+        }
+
+        .button {
+            flex: 1;
+            /* Flexbox 요소로, 사용 가능한 공간을 동일하게 나눔 */
+            text-align: center;
+            line-height: 100vh;
+            /* 버튼의 높이를 화면 전체 높이로 설정 */
+            background-color: white;
+            /* 초기 배경색 */
+            transition: background-color 0.3s;
+            /* 배경색 변경 애니메이션 */
+            font-size: 2em;
+            /* 텍스트 크기 */
+            border-right: 2px solid black;
+            /* 우측에 세로선 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* 텍스트를 중앙에 위치 */
+        }
+
+        .button:last-child {
+            border-right: none;
+            /* 마지막 버튼에서는 우측 테두리 제거 */
+        }
+
+        .button:hover {
+            background-color: #FFC0CB;
+            /* 마우스 오버 시 연핑크색 */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div id="individual" class="button" onclick="window.location.href='individual.html';">개인 이용자</div>
+        <div id="store-owner" class="button" onclick="window.location.href='store-owner.html';">사장 이용자</div>
+        <a href="http://192.168.1.112:8000/location" class="button" id="store-owner">사장 이용자</a>
+
+    </div>
+</body>
+
 </html>

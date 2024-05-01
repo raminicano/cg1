@@ -19,6 +19,7 @@ from .model.sql_models import *
 pydantic.json.ENCODERS_BY_TYPE[ObjectId] = str
 
 
+
 app = FastAPI()
 
 message = {
@@ -47,13 +48,14 @@ def get_secret(setting, secrets=secrets):
 
 # 서울 공공 API 데이터 가져오기 및 MongoDB에 저장
 @app.get("/fetch_and_save_congestion")
-async def fetch_and_save_congestion(place: str = Query(...)):
+async def fetch_and_save_congestion(place: str = Query(...), time: str = Query(...)):
     SEOUL_API_KEY = get_secret("SEOUL_API_KEY")
     url = f"http://openapi.seoul.go.kr:8088/{SEOUL_API_KEY}/json/citydata/1/2/{place}"
     response = requests.get(url)
     data = response.json()
     city_data = data['CITYDATA']
     print('일단 호출까지는 했음')
+    city_data['time'] = time
 
     # MongoDB에 데이터 저장 시도
     try:
@@ -83,6 +85,14 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
 
     print(closest_location, input_time)
     # 입력 시간이 제공되지 않았다면 현재 시간을 사용
+
+    try:
+        # 세션 사용
+        with db_connection.sessionmaker() as session:
+            landmark = session.query(Landmark).filter(Landmark.랜드마크 == closest_location).first()
+            print('데이터가 성공적으로 조회되었습니다.') 
+    except Exception as e:
+        print(f'데이터 조회 중 오류가 발생했습니다: {e}')
 
     if input_time is None:
         input_time = datetime.now()
@@ -123,8 +133,10 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
                 "area_nm" : closest_location,
                 "area_congest_lvl": data["LIVE_PPLTN_STTS"][0]["AREA_CONGEST_LVL"],
                 "area_congest_msg": data["LIVE_PPLTN_STTS"][0]["AREA_CONGEST_MSG"],
-                "inquiry_time": time_only
+                "inquiry_time": time_only,
+                "url": landmark.url if landmark else "No URL provided"
             }
+            print('result : ', result_data)
         else:
             # 입력 시간에 해당하는 예측 데이터를 찾기
             print('예측시간 찾는중')
@@ -136,24 +148,20 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
                 "area_nm" : closest_location,
                 "area_congest_lvl": forecast_data["FCST_CONGEST_LVL"],
                 "area_congest_msg" : message[forecast_data["FCST_CONGEST_LVL"]],
-                "inquiry_time": forecast_data['FCST_TIME']
+                "inquiry_time": forecast_data['FCST_TIME'],
+                "url": landmark.url if landmark else "No URL provided"
             }
         
 
-        print('result', result_data)
         # 리턴하기 전에 mysql에 저장하기
         # 새로운 데이터 엔트리 생성
-        new_entry = Congestion(
-            area_nm=result_data['area_nm'],
-            inquiry_time=result_data['inquiry_time'],  # 적절한 datetime 객체 필요
-            area_congest_lvl=result_data['area_congest_lvl'],
-            area_congest_msg=result_data['area_congest_msg']
-        )
+        new_congestion = Congestion(**result_data)
+
 
         try:
             # 세션 사용
             with db_connection.sessionmaker() as session:
-                session.add(new_entry)
+                session.add(new_congestion)
                 session.commit()  # 데이터베이스에 변경사항 커밋
                 print('데이터가 성공적으로 저장되었습니다.')  # 성공 메시지 출력
         except Exception as e:
@@ -162,6 +170,81 @@ async def get_congestion_info(location: str, input_time: datetime = Query(None))
         return {"code": 200, "message": "혼잡도 데이터 조회에 성공하였습니다.", "data": result_data}
     except Exception as e:
         return {"code": 500, "message": str(e), "data": {}}
+
+
+@app.get("/location/congestion-test")
+async def get_congestion_info_test(location: str, input_time: datetime = Query(None)):
+    closest_location = fetch_congestion_data(location)
+    print(closest_location, input_time)
+
+    try:
+        # 세션 사용
+        with db_connection.sessionmaker() as session:
+            landmark = session.query(Landmark).filter(Landmark.랜드마크 == closest_location).first()
+            print('데이터가 성공적으로 조회되었습니다.') 
+            print('landmark' , landmark)
+    except Exception as e:
+        print(f'데이터 조회 중 오류가 발생했습니다: {e}')
+
+
+    current_time = datetime.now()
+    query = {
+        "AREA_NM": closest_location,
+        'time' : input_time
+    }
+
+
+
+    try:
+        data = mydb['congestion'].find_one(query, sort=[('_id', -1)])
+        if not data:
+            result = await fetch_and_save_congestion(place=closest_location, time=input_time)
+            print(result)
+            data = mydb['congestion'].find_one(query, sort=[('_id', -1)])
+        
+        if input_time.date() == current_time.date() and input_time.hour == current_time.hour:
+            print('현재시간 조회')
+            result_data = { 
+                "area_nm" : closest_location,
+                "area_congest_lvl": data["LIVE_PPLTN_STTS"][0]["AREA_CONGEST_LVL"],
+                "area_congest_msg": data["LIVE_PPLTN_STTS"][0]["AREA_CONGEST_MSG"],
+                "inquiry_time": input_time,
+                "url": landmark.url if landmark else "No URL provided"
+            }
+        else:
+            print('예측시간 찾는중')
+            forecast_data = next((item for item in data["LIVE_PPLTN_STTS"][0]["FCST_PPLTN"]
+                                  if datetime.strptime(item["FCST_TIME"], "%Y-%m-%d %H:%M") == input_time), None)
+            if forecast_data is None:
+                raise HTTPException(status_code=404, detail="Forecast data not found for the given time")
+            result_data = {
+                "area_nm" : closest_location,
+                "area_congest_lvl": forecast_data["FCST_CONGEST_LVL"],
+                "area_congest_msg" : message[forecast_data["FCST_CONGEST_LVL"]],
+                "inquiry_time": forecast_data['FCST_TIME'],
+                "url": landmark.url if landmark else "No URL provided"
+            }
+
+         # 새로운 데이터 엔트리 생성
+        
+        
+        new_congestion = Congestion(**result_data)
+
+        try:
+            # 세션 사용
+            with db_connection.sessionmaker() as session:
+                session.add(new_congestion)
+                session.commit()  # 데이터베이스에 변경사항 커밋
+                print('데이터가 성공적으로 저장되었습니다.')  # 성공 메시지 출력
+        except Exception as e:
+            print(f'데이터 저장 중 오류가 발생했습니다: {e}')
+
+
+        return {"code": 200, "message": "혼잡도 데이터 조회에 성공하였습니다.", "data": result_data}
+    except Exception as e:
+        return {"code": 500, "message": str(e), "data": {}}
+
+
 
 
 # 근처 혼잡하지 않은 핫스팟 조회
@@ -185,22 +268,23 @@ async def hot_search(place: str, congestion: str, input_time: datetime = Query(N
     current_index = congestion_levels.index(congestion)
     print(current_index)
     if (current_index == 0) or (current_index == 1):
-        return {"code": 201, "message": "혼잡 데이터를 찾지 않아도 됩니다."}
+        return {"code": 201, "message": "혼잡 데이터를 찾지 않아도 됩니다.", "data" : {}}
     # 혼잡하지 않은 랜드마크 찾기
     for index, row in df_sorted.iterrows():
-        congestion_info = await get_congestion_info(row['랜드마크'], input_time)
+        congestion_info = await get_congestion_info_test(row['랜드마크'], input_time)
+        print(congestion_info)
         level = congestion_info['data']['area_congest_lvl']
         if congestion_levels.index(level) < current_index:
-            result_date = {"area_nm": row['랜드마크'], "area_congest_lvl": level}
-            return {"code": 200, "message" : "근처 혼잡하지 않은 지역 찾기에 성공했습니다." , "data" : result_date}
+            result_data = congestion_info['data']
+            return {"code": 200, "message" : "근처 혼잡하지 않은 지역 찾기에 성공했습니다." , "data" : result_data}
     
-    return {"code": 400, "message": "혼잡하지 않은 지역 찾기에 실패했습니다."}
+    return {"code": 400, "message": "혼잡하지 않은 지역 찾기에 실패했습니다.", "data" : {}}
 
 
 # 위치기반 이벤트 검색
 @app.get("/location/search/event")
 async def get_events(area_nm: str = Query(..., description="The area name to filter events")):
-    query = {"AREA_NM": area_nm}
+    query = {"AREA_NM": area_nm, "EVENT_STTS": {"$exists": True, "$not": {"$size": 0}}}
     projection = {"AREA_NM" : 1,"EVENT_STTS.EVENT_PERIOD": 1, "EVENT_STTS.EVENT_PLACE": 1, "EVENT_STTS.THUMBNAIL": 1, "EVENT_STTS.URL": 1, "_id": 0}
     print(query)
     try:

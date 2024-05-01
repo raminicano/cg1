@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>추천 페이지</title>
+    <link href="https://fonts.googleapis.com/css?family=Crete+Round" rel="stylesheet">
+    <script src="https://cdn.zingchart.com/zingchart.min.js"></script>
+    <script>zingchart.MODULESDIR = "https://cdn.zingchart.com/modules/";</script>
+
+
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            font-family: 'Arial', sans-serif;
+            background-color: #FAEAF3;
+            /* 연핑크색 배경 */
+        }
+
+        .container {
+            width: 80%;
+            margin: auto;
+            padding-top: 20px;
+            text-align: center;
+        }
+
+        input,
+        select,
+        button {
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background-color: #FFC0CB;
+            /* 연핑크색 버튼 */
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #E695A2;
+            /* 버튼 호버 시 색상 변경 */
+        }
+
+        table {
+            width: 100%;
+            /* 테이블의 너비를 컨테이너의 100%로 설정 */
+            border-collapse: collapse;
+            /* 경계선 붕괴를 통해 더 깔끔하고 연속적인 경계선 생성 */
+            margin-top: 20px;
+            /* 테이블 상단 여백 */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            /* 그림자 효과 */
+        }
+
+        th,
+        td {
+            border: 1px solid #FFC0CB;
+            /* 테이블 셀의 경계선 */
+            padding: 8px;
+            /* 셀 내부의 패딩 */
+            text-align: left;
+            /* 텍스트 왼쪽 정렬 */
+            color: #333;
+            /* 텍스트 색상 */
+        }
+
+        th {
+            background-color: #FFD6E7;
+            /* 테이블 헤더 배경 색상 */
+            color: #333;
+            /* 헤더 텍스트 색상 */
+            font-weight: bold;
+            /* 헤더 텍스트 두께 */
+        }
+
+        td {
+            background-color: #FFF4F9;
+            /* 테이블 데이터 셀 배경 색상 */
+        }
+
+        h2 {
+            color: #FF6384;
+            /* 제목 색상 */
+            margin-bottom: 10px;
+            /* 제목 아래의 여백 */
+        }
+
+        .no-data {
+            font-size: 16px;
+            color: #888;
+            margin-top: 20px;
+            /* 데이터 없음 메시지 상단 여백 */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>추천 시스템</h1>
+        <div>추천 장소: <%= data.area_nm %>
+        </div>
+        <div>분기: <%= data.quarter %>
+        </div>
+        <form id="recommendForm">
+            <select id="industry">
+                <option value="외식업">외식업</option>
+                <option value="서비스업">서비스업</option>
+                <option value="소매업">소매업</option>
+            </select>
+            <select id="subIndustry">
+                <!-- 소분류 선택은 JavaScript에서 동적으로 처리됩니다 -->
+            </select>
+            <select id="gender">
+                <option value="male">남성</option>
+                <option value="female">여성</option>
+            </select>
+            <select id="age">
+                <option value="10">10대</option>
+                <option value="20">20대</option>
+                <option value="30">30대</option>
+                <option value="40">40대</option>
+                <option value="50">50대</option>
+                <option value="60">60대 이상</option>
+            </select>
+            <select id="quarter">
+                <option value="1">1분기</option>
+                <option value="2">2분기</option>
+                <option value="3">3분기</option>
+                <option value="4">4분기</option>
+            </select>
+            <button type="button" onclick="submitCategory()">업종 추천받기</button>
+            <button type="button" onclick="submitStore()">위치 추천받기</button>
+
+        </form>
+
+        <h2>성별 매출 데이터</h2>
+        <div id="genderWordCloud"></div>
+        <hr />
+        <h2>나이 매출 데이터</h2>
+        <div id="ageWordCloud"></div>
+
+
+    </div>
+
+
+    <script>
+        const genderKorean = gender === 'female' ? '여성' : '남성';
+        const subIndustries = {
+            '외식업': ['한식음식점', '중식음식점', '일식음식점', '양식음식점', '제과점', '패스트푸드점', '치킨전문점', '분식전문점', '호프-간이주점', '커피-음료'],
+            '서비스업': ['일반교습학원', '외국어학원', '예술학원', '컴퓨터학원', '스포츠 강습', '일반의원', '치과의원', '한의원', '동물병원', '변호사사무소', '변리사사무소', '법무사사무소', '기타법무서비스', '회계사사무소', '세무사사무소', '당구장', '골프연습장', '볼링장', 'PC방', '전자게임장', '기타오락장', '복권방', '통신기기수리', '스포츠클럽', '자동차수리', '자동차미용', '모터사이클수리', '미용실', '네일숍', '피부관리실', '세탁소', '가전제품수리', '부동산중개업', '여관', '게스트하우스', '고시원', '노래방', '독서실', 'DVD방', '녹음실', '사진관', '통번역서비스', '건축물청소', '여행사', '비디오/서적임대', '의류임대', '가정용품임대'],
+            '소매업': ['슈퍼마켓', '편의점', '컴퓨터및주변장치판매', '핸드폰', '주류도매', '미곡판매', '육류판매', '수산물판매', '청과상', '반찬가게', '일반의류', '한복점', '유아의류', '신발', '가방', '안경', '시계및귀금속', '의약품', '의료기기', '서적', '문구', '화장품', '미용재료', '운동/경기용품', '자전거및기타운송장비', '완구', '섬유제품', '화초', '애완동물', '중고가구', '가구', '가전제품', '철물점', '악기', '인테리어', '조명용품', '중고차판매', '자동차부품', '모터사이클및부품', '재생용품 판매점', '예술품', '주유소', '전자상거래업']
+        };
+
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const industrySelect = document.getElementById('industry');
+            industrySelect.addEventListener('change', function () {
+                const industry = this.value;
+                const subIndustrySelect = document.getElementById('subIndustry');
+                subIndustrySelect.innerHTML = ''; // Clear existing options
+                subIndustries[industry].forEach(function (subIndustry) {
+                    const option = document.createElement('option');
+                    option.value = subIndustry;
+                    option.textContent = subIndustry;
+                    subIndustrySelect.appendChild(option);
+                });
+            });
+
+            // 초기 로드 시 첫 번째 대분류의 소분류를 로드
+            industrySelect.dispatchEvent(new Event('change'));
+
+            // 현재 분기를 셋팅
+            const currentQuarter = '<%= data.quarter %>'; // EJS를 통해 서버로부터 받은 분기 데이터
+            const quarterSelect = document.getElementById('quarter');
+            for (let option of quarterSelect.options) {
+                if (option.value === currentQuarter) {
+                    option.selected = true;
+                    break;
+                }
+            }
+        });
+
+        function submitStore() {
+            const location = '<%= data.area_nm %>';
+            const category = document.getElementById('subIndustry').value;
+            const gender = document.getElementById('gender').value;
+            const age = document.getElementById('age').value;
+            const quarter = document.getElementById('quarter').value;
+            const yearQuarter = parseInt(quarter) + 20220; // 분기에 2022를 더함
+            // const genderKorean = gender === 'female' ? '여성' : '남성';
+
+            console.log(location, category, gender, age, yearQuarter)
+
+            fetch('/recommend-store', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    location: location,
+                    category: category,
+                    gender: gender,
+                    age: age,
+                    quarter: yearQuarter
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 200) {
+                        // 여기서 'response' 대신 'data' 사용
+                        const genderSalesKey = `${genderKorean}_sales`; // "여성_sales" 또는 "남성_sales"
+                        const ageSalesKey = `age_${age}_sales`; // 예: "age_20_sales"
+                        console.log(data)
+                        renderWordCloud1(data.data[genderSalesKey], 'genderWordCloud');
+                        renderWordCloud1(data.data[ageSalesKey], 'ageWordCloud');
+                    } else {
+                        alert('추천 위치 결과: ' + data.message); // 응답 메시지 출력
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                    alert('오류가 발생했습니다.');
+                });
+
+        }
+
+        function submitCategory() {
+            const location = '<%= data.area_nm %>';
+            const gender = document.getElementById('gender').value;
+            const age = document.getElementById('age').value;
+            const quarter = document.getElementById('quarter').value;
+            const yearQuarter = parseInt(quarter) + 20220; // 분기에 2022를 더함
+
+            console.log(location, gender, age, yearQuarter)
+
+            fetch('/recommend-category', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    location: location,
+                    gender: gender,
+                    age: age,
+                    quarter: yearQuarter
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 200) {
+                        // 여기서 'response' 대신 'data' 사용
+                        console.log(data)
+                        renderWordCloud2(data.data.genderResults, 'genderWordCloud');
+                        renderWordCloud2(data.data.ageResults, 'ageWordCloud');
+
+                    } else {
+                        alert('추천 위치 결과: ' + data.message); // 응답 메시지 출력
+                    }
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                    alert('오류가 발생했습니다.');
+                });
+
+        }
+
+
+        // 초기 로드 시 첫 번째 대분류의 소분류를 로드
+        document.getElementById('industry').dispatchEvent(new Event('change'));
+
+
+        function renderWordCloud2(data, elementId) {
+            const words = data.map(item => ({
+                text: item.service_code,
+                count: item.sales
+            }));
+
+            var myConfig = {
+                type: 'wordcloud',
+                options: {
+                    words: words,
+                    minLength: 5,
+                    maxItems: 40,
+                    aspect: 'spiral',
+                    colorType: 'palette',
+                    palette: ['#D32F2F', '#5D4037', '#1976D2', '#E53935', '#6D4C41', '#1E88E5', '#F44336', '#795548', '#2196F3', '#EF5350', '#8D6E63', '#42A5F5'],
+                    style: {
+                        fontFamily: 'Crete Round',
+                        hoverState: {
+                            backgroundColor: '#D32F2F',
+                            borderRadius: 2,
+                            fontColor: 'white'
+                        },
+                        tooltip: {
+                            text: '%text: %hits',
+                            visible: true,
+                            alpha: 0.9,
+                            backgroundColor: '#1976D2',
+                            borderRadius: 2,
+                            borderColor: 'none',
+                            fontColor: 'white',
+                            fontFamily: 'Georgia',
+                            textAlpha: 1
+                        }
+                    }
+                }
+            };
+
+            zingchart.render({
+                id: elementId,
+                data: myConfig,
+                height: 400,
+                width: '100%'
+            });
+        }
+
+        function renderWordCloud1(data, elementId) {
+            const words = data.map(item => ({
+                text: item.상권_코드_명,
+                count: item.sales
+            }));
+
+            var myConfig = {
+                type: 'wordcloud',
+                options: {
+                    words: words,
+                    minLength: 5,
+                    maxItems: 40,
+                    aspect: 'spiral',
+                    colorType: 'palette',
+                    palette: ['#D32F2F', '#5D4037', '#1976D2', '#E53935', '#6D4C41', '#1E88E5', '#F44336', '#795548', '#2196F3', '#EF5350', '#8D6E63', '#42A5F5'],
+                    style: {
+                        fontFamily: 'Crete Round',
+                        hoverState: {
+                            backgroundColor: '#D32F2F',
+                            borderRadius: 2,
+                            fontColor: 'white'
+                        },
+                        tooltip: {
+                            text: '%text: %hits',
+                            visible: true,
+                            alpha: 0.9,
+                            backgroundColor: '#1976D2',
+                            borderRadius: 2,
+                            borderColor: 'none',
+                            fontColor: 'white',
+                            fontFamily: 'Georgia',
+                            textAlpha: 1
+                        }
+                    }
+                }
+            };
+
+            zingchart.render({
+                id: elementId,
+                data: myConfig,
+                height: 400,
+                width: '100%'
+            });
+        }
+
+
+
+    </script>
+</body>
+
+</html>

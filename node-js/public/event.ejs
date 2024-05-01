@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>서울 이벤트 안내</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            font-family: 'Arial', sans-serif;
+            background-color: #FAEAF3;
+            /* 연핑크색 배경 */
+        }
+
+        .container {
+            width: 80%;
+            margin: auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .event-card {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            margin-left: auto;
+            /* 왼쪽 마진을 자동으로 설정 */
+            margin-right: auto;
+            /* 오른쪽 마진을 자동으로 설정 */
+            width: 50%;
+            /* 너비 설정 */
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+
+        .event-thumbnail {
+            width: 100%;
+            height: auto;
+            object-fit: cover;
+        }
+
+        .event-info {
+            padding: 15px;
+        }
+
+        .event-title {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .event-period {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .event-place {
+            font-size: 16px;
+            color: #888;
+            margin-bottom: 10px;
+        }
+
+        .event-link {
+            text-decoration: none;
+            color: #007BFF;
+            font-size: 16px;
+        }
+
+        .no-events {
+            font-size: 20px;
+            color: #999;
+            margin-top: 50px;
+        }
+
+        .no-events-img {
+            width: 50%;
+            height: auto;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <% if (data && data.length> 0) { %>
+            <% data.forEach(function(event) { %>
+                <div class="event-card">
+                    <img src="<%= event.thumbnail %>" alt="Event thumbnail" class="event-thumbnail">
+                    <div class="event-info">
+                        <div class="event-title">
+                            <%= event.area_nm %>
+                        </div>
+                        <div class="event-period">기간: <%= event.event_period %>
+                        </div>
+                        <div class="event-place">장소: <%= event.event_place %>
+                        </div>
+                        <a href="<%= event.url %>" class="event-link" target="_blank">이벤트 상세보기</a>
+                    </div>
+                </div>
+                <% }); %>
+                    <% } else { %>
+                        <div class="no-events">이벤트 데이터가 없습니다.</div>
+                        <img src="image_404.webp" alt="No events found" class="no-events-img">
+                        <% } %>
+                            <script>
+                                setTimeout(function () {
+                                    window.history.back(); // 5초 후 이전 페이지로 이동
+                                }, 3000); // 5000ms = 5초
+                            </script>
+    </div>
+</body>
+
+</html>

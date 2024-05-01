@@ -10,6 +10,8 @@ class Congestion(Base):
     inquiry_time = Column(DateTime, primary_key=True)
     area_congest_lvl = Column(String(255))
     area_congest_msg = Column(String(255))
+    url = Column(String(512))
+    
 
 
 class Event(Base):
@@ -62,3 +64,4 @@ class Landmark(Base):
     랜드마크 = Column(String(255), primary_key=True)
     위도 = Column(Float)
     경도 = Column(Float)
+    url = Column(String(512))

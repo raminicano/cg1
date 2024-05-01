@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>혼잡도 조회 결과</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            font-family: 'Arial', sans-serif;
+            background-color: #FAEAF3;
+            /* 연핑크색 배경 */
+        }
+
+        .container {
+            width: 80%;
+            margin: auto;
+            padding-top: 20px;
+            text-align: center;
+        }
+
+        .title {
+            font-size: 23px;
+            /* 조금 더 크게 */
+            /* 진하게 */
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .image-box {
+            width: 60%;
+            /* 이미지 박스 크기 조절 */
+            margin: 20px auto;
+            border-radius: 15px;
+            /* 이미지 테두리 둥글게 */
+            overflow: hidden;
+            /* 이미지 테두리 안에서 자르기 */
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            /* 세련된 그림자 효과 */
+        }
+
+        .image {
+            width: 100%;
+            /* 박스에 딱 맞게 */
+            height: auto;
+            /* 이미지 비율 유지 */
+            display: block;
+            /* 블록 레벨 요소로 변경 */
+        }
+
+        .level {
+            font-size: 25px;
+            /* title보다 작고 message보다 크게 */
+            font-weight: bold;
+            /* 진하게 */
+            color: #666;
+            /* 색상 */
+            margin: 10px 0;
+            /* 여백 조정 */
+        }
+
+        .message {
+            font-size: 18px;
+            color: #555;
+            margin: 20px;
+        }
+
+        .button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #FFC0CB;
+            /* 연핑크색 버튼 */
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s, box-shadow 0.3s;
+        }
+
+        .button:hover {
+            background-color: #E695A2;
+            /* 버튼 호버 시 색상 변경 */
+        }
+
+        .recommend-button {
+            background-color: #E6739F;
+            /* 강조 색상 */
+            font-weight: bold;
+            /* 글씨 두껍게 */
+            padding: 15px 30px;
+            /* 패딩 증가 */
+            font-size: 18px;
+            /* 글자 크기 증가 */
+            border-radius: 10px;
+            /* 모서리 둥글게 */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            /* 그림자 추가 */
+        }
+
+        .recommend-button:hover {
+            background-color: #FF639D;
+            /* 호버시 색상 변경 */
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+            /* 호버시 그림자 강조 */
+        }
+
+        .highlight {
+            font-size: 28px;
+            /* 크기 조정 */
+            font-weight: bold;
+            /* 굵게 */
+            color: #333;
+            /* 색상 */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <% if (code===400 || code===201) { %>
+            <div class="title">
+                <%= message %>
+            </div>
+            <% if (code===400) { %>
+                <div class="image-box">
+                    <img src="image_404.webp" alt="Not found image" class="image">
+                </div>
+                <% } %>
+                    <script>
+                        setTimeout(function () {
+                            window.history.back(); // 5초 후 이전 페이지로 이동
+                        }, 3000); // 5000ms = 5초
+                    </script>
+                    <% } else { %>
+                        <div class="title">
+                            근처 랜드마크인 <span class="highlight">
+                                <%= data.area_nm %>
+                            </span>의 혼잡도는 <span class="highlight">
+                                <%= data.area_congest_lvl %>
+                            </span>입니다.
+                        </div>
+
+                        <div class="image-box">
+                            <img src="<%= data.url %>" alt="<%= data.area_nm %> 이미지" class="image">
+                        </div>
+                        <div class="level">
+                            <%= data.area_congest_lvl %>
+                        </div>
+                        <div class="message">
+                            <%= data.area_congest_msg %>
+                        </div>
+                        <button class="button" onclick="searchHotspot()">다른 혼잡하지 않은 지역 찾아보기</button>
+                        <button class="button" onclick="searchEvent()">이 지역 근처의 이벤트 찾아보기</button><br />
+                        <hr />
+                        <button class="button recommend-button" onclick="findRecommendation()">추천 장소 찾기</button>
+                        <% } %>
+    </div>
+
+    <script>
+        function searchHotspot() {
+            const areaNm = "<%= data.area_nm %>";
+            const areaCongestLvl = "<%= data.area_congest_lvl %>";
+            const inquiryTimeRaw = "<%= data.inquiry_time %>";
+            const inquiryTime = new Date(inquiryTimeRaw).toISOString(); // ISO 8601 형식으로 변환
+
+            console.log("Raw Inquiry Time:", inquiryTimeRaw); // 원본 시간 로깅
+            console.log("Converted Inquiry Time:", inquiryTime); // 변환된 시간 로깅
+
+            window.location.href = `/search-hotspot?place=${encodeURIComponent(areaNm)}&congestion=${encodeURIComponent(areaCongestLvl)}&input_time=${encodeURIComponent(inquiryTime)}`;
+        }
+
+        function searchEvent() {
+            const areaNm = "<%= data.area_nm %>";
+            window.location.href = `/search-event?area_nm=${encodeURIComponent(areaNm)}`;
+        }
+
+        function findRecommendation() {
+            const areaNm = "<%= data.area_nm %>";
+            const inquiryTimeRaw = "<%= data.inquiry_time %>";
+            // const inquiryTime = new Date(inquiryTimeRaw).toISOString(); // ISO 8601 형식으로 변환
+
+            window.location.href = `/recommendation?area_nm=${encodeURIComponent(areaNm)}&input_time=${encodeURIComponent(inquiryTimeRaw)}`;
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <title>개인 사용자 페이지</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            font-family: 'Arial', sans-serif;
+            background-color: #FAEAF3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            /* 중심 축을 수직으로 설정 */
+        }
+
+        .container {
+            width: 500px;
+            text-align: center;
+            background-color: #fff;
+            padding: 40px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        .title {
+            font-size: 28px;
+            margin-bottom: 20px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .input-label {
+            font-size: 16px;
+            color: #333;
+            float: left;
+            margin-right: 10px;
+            padding-top: 12px;
+        }
+
+        .input-box {
+            padding: 12px;
+            margin: 5px 0 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: calc(100% - 24px);
+            box-sizing: border-box;
+            display: block;
+        }
+
+        .button {
+            padding: 12px 25px;
+            border: none;
+            background-color: #FFC0CB;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            width: 100%;
+        }
+
+        .button:hover {
+            background-color: #E695A2;
+        }
+
+        .warning-text {
+            color: #E53E3E;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            clear: both;
+            margin-bottom: 20px;
+        }
+
+        .back-button {
+            align-self: flex-start;
+            /* 버튼을 왼쪽으로 정렬 */
+            margin: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <button class="button back-button" onclick="window.location.href='individual.html';">개인 페이지 메인으로 돌아가기</button>
+    <div class="container">
+        <div class="title">어디로 언제 가실 예정이신가요?</div>
+        <div class="form-group">
+            <span class="input-label">위치:</span>
+            <input class="input-box" id="location-input" type="text" placeholder="강남">
+        </div>
+        <div class="form-group">
+            <span class="input-label">시간:</span>
+            <input class="input-box" id="time-input" type="text" placeholder="YYYY-MM-DD HH:MM">
+        </div>
+        <div class="warning-text">시간은 현재로부터 최대 11시간 이후까지만 선택 가능합니다.</div>
+        <button class="button" onclick="searchCongestion()">결과 보러가기</button>
+    </div>
+</body>
+
+</html>
