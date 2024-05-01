@@ -27,6 +27,11 @@
             padding: 40px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             border-radius: 8px;
+            margin: auto;
+            position: relative;
+            /* Position relative for absolute positioning of button */
+            top: 50px;
+            /* Push container down to make space for button */
         }
 
         .title {
@@ -39,9 +44,10 @@
         .input-label {
             font-size: 16px;
             color: #333;
-            float: left;
-            margin-right: 10px;
-            padding-top: 12px;
+            display: block;
+            /* Changed from float left to display block for better control */
+            margin: 10px 0 5px;
+            /* Adjust margins for label */
         }
 
         .input-box {
@@ -51,7 +57,6 @@
             border-radius: 5px;
             width: calc(100% - 24px);
             box-sizing: border-box;
-            display: block;
         }
 
         .button {
@@ -76,20 +81,26 @@
         }
 
         .form-group {
-            clear: both;
             margin-bottom: 20px;
         }
 
         .back-button {
-            align-self: flex-start;
-            /* 버튼을 왼쪽으로 정렬 */
-            margin: 20px;
+            background-color: #FFC0CB;
+            color: #FFF;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            position: absolute;
+            /* Absolute positioning to place it at the top left */
+            top: 10px;
+            left: 10px;
+            /* Position button at the top left corner */
         }
     </style>
 </head>
 
 <body>
-    <button class="button back-button" onclick="window.location.href='individual.html';">개인 페이지 메인으로 돌아가기</button>
+    <a href="individual.html" class="back-button">개인 페이지 메인으로 돌아가기</a>
     <div class="container">
         <div class="title">어디로 언제 가실 예정이신가요?</div>
         <div class="form-group">
@@ -103,6 +114,19 @@
         <div class="warning-text">시간은 현재로부터 최대 11시간 이후까지만 선택 가능합니다.</div>
         <button class="button" onclick="searchCongestion()">결과 보러가기</button>
     </div>
+    <script>
+        function searchCongestion() {
+            const location = document.getElementById('location-input').value;
+            const time = document.getElementById('time-input').value;
+            // Simple validation for time input format
+            const timeRegex = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
+            if (!timeRegex.test(time)) {
+                alert("시간 형식이 올바르지 않습니다. 'YYYY-MM-DD HH:MM' 형식으로 입력해주세요.");
+                return;
+            }
+            window.location.href = `/search-congestion?location=${encodeURIComponent(location)}&input_time=${time}`;
+        }
+    </script>
 </body>
 
 </html>

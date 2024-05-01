@@ -84,10 +84,37 @@
             height: auto;
             margin-top: 20px;
         }
+
+        .back-button {
+            background-color: #FFC0CB;
+            color: #FFF;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            position: absolute;
+            /* Absolute positioning to place it at the top left */
+            top: 10px;
+            left: 10px;
+            /* Position button at the top left corner */
+        }
+
+        .back-button {
+            background-color: #FFC0CB;
+            color: #FFF;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            position: absolute;
+            /* Absolute positioning to place it at the top left */
+            top: 10px;
+            left: 10px;
+            /* Position button at the top left corner */
+        }
     </style>
 </head>
 
 <body>
+    <a href="individual.html" class="back-button">개인 페이지 메인으로 돌아가기</a>
     <div class="container">
         <% if (data && data.length> 0) { %>
             <% data.forEach(function(event) { %>
@@ -108,12 +135,13 @@
                     <% } else { %>
                         <div class="no-events">이벤트 데이터가 없습니다.</div>
                         <img src="image_404.webp" alt="No events found" class="no-events-img">
+                        <script>
+                            setTimeout(function () {
+                                window.history.back(); // 5초 후 이전 페이지로 이동
+                            }, 3000); // 5000ms = 5초
+                        </script>
                         <% } %>
-                            <script>
-                                setTimeout(function () {
-                                    window.history.back(); // 5초 후 이전 페이지로 이동
-                                }, 3000); // 5000ms = 5초
-                            </script>
+
     </div>
 </body>
 

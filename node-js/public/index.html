@@ -21,6 +21,8 @@
         }
 
         .button {
+            text-decoration: none;
+            /* 밑줄 제거 */
             flex: 1;
             /* Flexbox 요소로, 사용 가능한 공간을 동일하게 나눔 */
             text-align: center;
@@ -38,6 +40,10 @@
             justify-content: center;
             align-items: center;
             /* 텍스트를 중앙에 위치 */
+            text-decoration: none;
+            /* 밑줄 제거 */
+            color: black;
+            /* 텍스트 색상 설정 */
         }
 
         .button:last-child {
@@ -48,6 +54,8 @@
         .button:hover {
             background-color: #FFC0CB;
             /* 마우스 오버 시 연핑크색 */
+            text-decoration: none;
+            /* 호버 시에도 밑줄이 생기지 않도록 설정 */
         }
     </style>
 </head>
@@ -55,7 +63,6 @@
 <body>
     <div class="container">
         <div id="individual" class="button" onclick="window.location.href='individual.html';">개인 이용자</div>
-        <div id="store-owner" class="button" onclick="window.location.href='store-owner.html';">사장 이용자</div>
         <a href="http://192.168.1.112:8000/location" class="button" id="store-owner">사장 이용자</a>
 
     </div>

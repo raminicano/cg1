@@ -115,10 +115,24 @@
             color: #333;
             /* 색상 */
         }
+
+        .back-button {
+            background-color: #FFC0CB;
+            color: #FFF;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            position: absolute;
+            /* Absolute positioning to place it at the top left */
+            top: 10px;
+            left: 10px;
+            /* Position button at the top left corner */
+        }
     </style>
 </head>
 
 <body>
+    <a href="individual.html" class="back-button">개인 페이지 메인으로 돌아가기</a>
     <div class="container">
         <% if (code===400 || code===201) { %>
             <div class="title">
