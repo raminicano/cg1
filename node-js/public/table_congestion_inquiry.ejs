@@ -4,11 +4,6 @@
 <head>
     <meta charset="UTF-8">
     <title>추천 페이지</title>
-    <link href="https://fonts.googleapis.com/css?family=Crete+Round" rel="stylesheet">
-    <script src="https://cdn.zingchart.com/zingchart.min.js"></script>
-    <script>zingchart.MODULESDIR = "https://cdn.zingchart.com/modules/";</script>
-
-
     <style>
         body,
         html {
@@ -100,26 +95,12 @@
             margin-top: 20px;
             /* 데이터 없음 메시지 상단 여백 */
         }
-
-        .back-button {
-            background-color: #FFC0CB;
-            color: #FFF;
-            text-decoration: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            position: absolute;
-            /* Absolute positioning to place it at the top left */
-            top: 10px;
-            left: 10px;
-            /* Position button at the top left corner */
-        }
     </style>
 </head>
 
 <body>
-    <a href="individual.html" class="back-button">개인 페이지 메인으로 돌아가기</a>
     <div class="container">
-        <h1>상권 데이터 조회</h1>
+        <h1>추천 시스템</h1>
         <div>추천 장소: <%= data.area_nm %>
         </div>
         <div>분기: <%= data.quarter %>
@@ -156,12 +137,8 @@
 
         </form>
 
-        <h2>성별 매출 데이터</h2>
-        <div id="genderWordCloud"></div>
-        <hr />
-        <h2>나이 매출 데이터</h2>
-        <div id="ageWordCloud"></div>
-
+        <div id="genderSalesTable"></div>
+        <div id="ageSalesTable"></div>
 
     </div>
 
@@ -174,33 +151,16 @@
             '소매업': ['슈퍼마켓', '편의점', '컴퓨터및주변장치판매', '핸드폰', '주류도매', '미곡판매', '육류판매', '수산물판매', '청과상', '반찬가게', '일반의류', '한복점', '유아의류', '신발', '가방', '안경', '시계및귀금속', '의약품', '의료기기', '서적', '문구', '화장품', '미용재료', '운동/경기용품', '자전거및기타운송장비', '완구', '섬유제품', '화초', '애완동물', '중고가구', '가구', '가전제품', '철물점', '악기', '인테리어', '조명용품', '중고차판매', '자동차부품', '모터사이클및부품', '재생용품 판매점', '예술품', '주유소', '전자상거래업']
         };
 
-
-        document.addEventListener('DOMContentLoaded', function () {
-            const industrySelect = document.getElementById('industry');
-            industrySelect.addEventListener('change', function () {
-                const industry = this.value;
-                const subIndustrySelect = document.getElementById('subIndustry');
-                subIndustrySelect.innerHTML = ''; // Clear existing options
-                subIndustries[industry].forEach(function (subIndustry) {
-                    const option = document.createElement('option');
-                    option.value = subIndustry;
-                    option.textContent = subIndustry;
-                    subIndustrySelect.appendChild(option);
-                });
+        document.getElementById('industry').addEventListener('change', function () {
+            const industry = this.value;
+            const subIndustrySelect = document.getElementById('subIndustry');
+            subIndustrySelect.innerHTML = ''; // Clear existing options
+            subIndustries[industry].forEach(function (subIndustry) {
+                const option = document.createElement('option');
+                option.value = subIndustry;
+                option.textContent = subIndustry;
+                subIndustrySelect.appendChild(option);
             });
-
-            // 초기 로드 시 첫 번째 대분류의 소분류를 로드
-            industrySelect.dispatchEvent(new Event('change'));
-
-            // 현재 분기를 셋팅
-            const currentQuarter = '<%= data.quarter %>'; // EJS를 통해 서버로부터 받은 분기 데이터
-            const quarterSelect = document.getElementById('quarter');
-            for (let option of quarterSelect.options) {
-                if (option.value === currentQuarter) {
-                    option.selected = true;
-                    break;
-                }
-            }
         });
 
         function submitStore() {
@@ -234,8 +194,8 @@
                         const genderSalesKey = `${genderKorean}_sales`; // "여성_sales" 또는 "남성_sales"
                         const ageSalesKey = `age_${age}_sales`; // 예: "age_20_sales"
                         console.log(data)
-                        renderWordCloud1(data.data[genderSalesKey], 'genderWordCloud');
-                        renderWordCloud1(data.data[ageSalesKey], 'ageWordCloud');
+                        createTable(data.data[genderSalesKey], 'genderSalesTable', `${genderKorean} 매출 데이터`);
+                        createTable(data.data[ageSalesKey], 'ageSalesTable', `${age}대 매출 데이터`);
                     } else {
                         alert('추천 위치 결과: ' + data.message); // 응답 메시지 출력
                     }
@@ -273,9 +233,8 @@
                     if (data.code === 200) {
                         // 여기서 'response' 대신 'data' 사용
                         console.log(data)
-                        renderWordCloud2(data.data.genderResults, 'genderWordCloud');
-                        renderWordCloud2(data.data.ageResults, 'ageWordCloud');
-
+                        createTable(data.data.genderResults, 'genderSalesTable', `${genderKorean} 매출 데이터`);
+                        createTable(data.data.ageResults, 'ageSalesTable', `${age}대 매출 데이터`);
                     } else {
                         alert('추천 위치 결과: ' + data.message); // 응답 메시지 출력
                     }
@@ -288,102 +247,48 @@
         }
 
 
+        function createTable(data, containerId, title) {
+            const container = document.getElementById(containerId);
+            let tableHTML = `<h2>${title}</h2>`;
+            console.log(data)
+            if (data && data.length > 0) {
+                tableHTML += '<table><tr>';
+                // 테이블 헤더 생성
+                Object.keys(data[0]).forEach(key => {
+                    tableHTML += `<th>${key}</th>`;
+                });
+                tableHTML += '</tr>';
+                // 테이블 데이터 로우 생성
+                data.forEach(item => {
+                    tableHTML += '<tr>';
+                    Object.values(item).forEach(value => {
+                        tableHTML += `<td>${value}</td>`;
+                    });
+                    tableHTML += '</tr>';
+                });
+                tableHTML += '</table>';
+            } else {
+                tableHTML += '<p>데이터가 없습니다.</p>';
+            }
+            container.innerHTML = tableHTML;
+        }
+
+
         // 초기 로드 시 첫 번째 대분류의 소분류를 로드
         document.getElementById('industry').dispatchEvent(new Event('change'));
 
-
-        function renderWordCloud2(data, elementId) {
-            const words = data.map(item => ({
-                text: item.service_code,
-                count: item.sales
-            }));
-
-            var myConfig = {
-                type: 'wordcloud',
-                options: {
-                    words: words,
-                    minLength: 5,
-                    maxItems: 40,
-                    aspect: 'spiral',
-                    colorType: 'palette',
-                    palette: ['#D32F2F', '#5D4037', '#1976D2', '#E53935', '#6D4C41', '#1E88E5', '#F44336', '#795548', '#2196F3', '#EF5350', '#8D6E63', '#42A5F5'],
-                    style: {
-                        fontFamily: 'Crete Round',
-                        hoverState: {
-                            backgroundColor: '#D32F2F',
-                            borderRadius: 2,
-                            fontColor: 'white'
-                        },
-                        tooltip: {
-                            text: '%text: %hits',
-                            visible: true,
-                            alpha: 0.9,
-                            backgroundColor: '#1976D2',
-                            borderRadius: 2,
-                            borderColor: 'none',
-                            fontColor: 'white',
-                            fontFamily: 'Georgia',
-                            textAlpha: 1
-                        }
-                    }
+        // 페이지 로드 후 실행되는 함수
+        document.addEventListener('DOMContentLoaded', function () {
+            const currentQuarter = '<%= data.quarter %>'; // EJS를 통해 서버로부터 받은 분기 데이터
+            const quarterSelect = document.getElementById('quarter');
+            // 모든 옵션을 순회하며 일치하는 값이 있으면 선택
+            for (let option of quarterSelect.options) {
+                if (option.value === currentQuarter) {
+                    option.selected = true;
+                    break;
                 }
-            };
-
-            zingchart.render({
-                id: elementId,
-                data: myConfig,
-                height: 400,
-                width: '100%'
-            });
-        }
-
-        function renderWordCloud1(data, elementId) {
-            const words = data.map(item => ({
-                text: item.상권_코드_명,
-                count: item.sales
-            }));
-
-            var myConfig = {
-                type: 'wordcloud',
-                options: {
-                    words: words,
-                    minLength: 5,
-                    maxItems: 40,
-                    aspect: 'spiral',
-                    colorType: 'palette',
-                    palette: ['#D32F2F', '#5D4037', '#1976D2', '#E53935', '#6D4C41', '#1E88E5', '#F44336', '#795548', '#2196F3', '#EF5350', '#8D6E63', '#42A5F5'],
-                    style: {
-                        fontFamily: 'Crete Round',
-                        hoverState: {
-                            backgroundColor: '#D32F2F',
-                            borderRadius: 2,
-                            fontColor: 'white'
-                        },
-                        tooltip: {
-                            text: '%text: %hits',
-                            visible: true,
-                            alpha: 0.9,
-                            backgroundColor: '#1976D2',
-                            borderRadius: 2,
-                            borderColor: 'none',
-                            fontColor: 'white',
-                            fontFamily: 'Georgia',
-                            textAlpha: 1
-                        }
-                    }
-                }
-            };
-
-            zingchart.render({
-                id: elementId,
-                data: myConfig,
-                height: 400,
-                width: '100%'
-            });
-        }
-
-
-
+            }
+        });
     </script>
 </body>
 
