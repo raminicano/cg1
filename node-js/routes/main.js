@@ -177,7 +177,6 @@ router.get('/search-hotspot', async (req, res) => {
   }
 });
 
-
 // 이벤트 조회
 router.get('/search-event', async (req, res) => {
   const { area_nm } = req.query;
@@ -220,9 +219,7 @@ router.get('/search-event', async (req, res) => {
   }
 });
 
-
 // 추천 페이지 구현
-// Route to handle recommendation based on area name
 router.get('/recommendation', async (req, res) => {
   const { area_nm, input_time } = req.query;
 
@@ -269,74 +266,12 @@ router.get('/recommendation', async (req, res) => {
   }
 });
 
-// 위치 추천
-
-
-async function handleMissingCodes(codes, location, category, gender, age, quarter) {
-  var savedData = [];
-  // 외부 API 호출 및 데이터베이스에 저장
-  await Promise.all(codes.map(async code => {
-    const apiResponse = await axios.post('http://0.0.0.0:3000/location/recommend/store', {
-      location,
-      category,
-      gender,
-      age,
-      quarter
-    });
-
-    if (apiResponse.data.code === 200) {
-      // 데이터베이스에 각 상권 데이터 저장
-      const genderKey = `${gender}_sales`;
-      await Promise.all(apiResponse.data.data[genderKey].map(async (item) => {
-        console.log(item)
-        const insertResult1 = await pool.execute(`
-              INSERT INTO location (district_code, service_code, quarter, gu_code, dong_code, ${mysql.escapeId(gender)})
-              VALUES (?, ?, ?, ?, ?, ?)
-          `, [
-          item.상권_코드_명,
-          category,
-          quarter,
-          item.자치구_코드_명,
-          item.행정동_코드_명,
-          item.sales
-        ]);
-
-        // savedData.push(insertResult1);
-      }));
-
-      // 나이에 따른 데이터를 가정하고 추가 저장 로직을 구현
-      const ageKey = `age_${age}_sales`;
-
-      await Promise.all(apiResponse.data.data[ageKey].map(async (item) => {
-        const insertResult2 = await pool.execute(`
-              INSERT INTO location (district_code, service_code, quarter, gu_code, dong_code, ${mysql.escapeId('age_' + age)})
-              VALUES (?, ?, ?, ?, ?, ?)
-          `, [
-          item.상권_코드_명,
-          category,
-          quarter,
-          item.자치구_코드_명,
-          item.행정동_코드_명,
-          item.sales
-        ]);
-
-        // savedData.push(insertResult2);
-      }));
-
-    } else {
-      throw new Error("API 호출 실패 혹은 데이터 부재");
-    }
-    savedData.push(apiResponse.data); // 예시로 응답 데이터를 그대로 저장
-  }));
-  return savedData;
-}
-
 router.post('/recommend-store', async (req, res) => {
   const { location, category, gender, age, quarter } = req.body
   const genderKorean = gender === 'female' ? '여성' : '남성';
   const apiResponse = await axios.post('http://0.0.0.0:3000/location/recommend/store',
     { location, category, gender: genderKorean, age, quarter });
-
+  // console.log(apiResponse.data.data.여성_sales)
   res.json(apiResponse.data);
 
 });
@@ -421,7 +356,64 @@ async function saveData(genderOrAge, quarter, location, data) {
 
 
 
+async function handleMissingCodes(codes, location, category, gender, age, quarter) {
+  var savedData = [];
+  // 외부 API 호출 및 데이터베이스에 저장
+  await Promise.all(codes.map(async code => {
+    const apiResponse = await axios.post('http://0.0.0.0:3000/location/recommend/store', {
+      location,
+      category,
+      gender,
+      age,
+      quarter
+    });
 
+    if (apiResponse.data.code === 200) {
+      // 데이터베이스에 각 상권 데이터 저장
+      const genderKey = `${gender}_sales`;
+      await Promise.all(apiResponse.data.data[genderKey].map(async (item) => {
+        console.log(item)
+        const insertResult1 = await pool.execute(`
+              INSERT INTO location (district_code, service_code, quarter, gu_code, dong_code, ${mysql.escapeId(gender)})
+              VALUES (?, ?, ?, ?, ?, ?)
+          `, [
+          item.상권_코드_명,
+          category,
+          quarter,
+          item.자치구_코드_명,
+          item.행정동_코드_명,
+          item.sales
+        ]);
+
+        // savedData.push(insertResult1);
+      }));
+
+      // 나이에 따른 데이터를 가정하고 추가 저장 로직을 구현
+      const ageKey = `age_${age}_sales`;
+
+      await Promise.all(apiResponse.data.data[ageKey].map(async (item) => {
+        const insertResult2 = await pool.execute(`
+              INSERT INTO location (district_code, service_code, quarter, gu_code, dong_code, ${mysql.escapeId('age_' + age)})
+              VALUES (?, ?, ?, ?, ?, ?)
+          `, [
+          item.상권_코드_명,
+          category,
+          quarter,
+          item.자치구_코드_명,
+          item.행정동_코드_명,
+          item.sales
+        ]);
+
+        // savedData.push(insertResult2);
+      }));
+
+    } else {
+      throw new Error("API 호출 실패 혹은 데이터 부재");
+    }
+    savedData.push(apiResponse.data); // 예시로 응답 데이터를 그대로 저장
+  }));
+  return savedData;
+}
 // router.post('/recommend-store', async (req, res) => {
 //   const { location, category, gender, age, quarter } = req.body;
 //   const genderKorean = gender === 'female' ? '여성' : '남성';
